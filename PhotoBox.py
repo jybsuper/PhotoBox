@@ -1,10 +1,8 @@
-from flask import Flask, Response, session, request, session, escape
+from flask import Flask, Response, request, session, escape
 from pymongo import MongoClient
 import hashlib
-import image
 from cStringIO import StringIO
 from pywebhdfs.webhdfs import PyWebHdfsClient
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = '"\x9c\xb81\x1b\x15\xcczc[\r~\x99X\xbf\xa7Y\xd3\xa2\x99Q\xb3B\xef'
@@ -99,7 +97,7 @@ def index():
         photos = db.users.find_one({"username": session['username']})["photos"]
         names = [db.photos.find_one(photo)["md5"] for photo in photos]
         photos = hdfs_get(names)
-        return Response(photos[1], mimetype='image/jpeg')
+        return Response(photos[0], mimetype='image/jpeg')
 
 
 def hdfs_save(f, name):
