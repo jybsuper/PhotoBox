@@ -67,7 +67,7 @@ def upload():
         return json.dumps({"user": None})
     elif request.method == 'POST':
         md5 = hashlib.md5()
-        md5.update(request.files['uploaded_file'].read())
+        md5.update(StringIO(request.files['uploaded_file'].read()).getvalue())
         if db.photos.count({"md5": md5.hexdigest()}):
             photo_id = db.photos.find_one({"md5": md5.hexdigest()})["_id"]
         else:
@@ -76,8 +76,8 @@ def upload():
         if photo_id not in photos:
             photos.append(photo_id)
             db.users.update_one({"username": session['username']}, {"$set": {"photos": photos}})
-            hdfs_save(StringIO(request.files['uploaded_file'].read()), md5.hexdigest())
-        return json.dumps({"user": escape(session['username'])})
+            hdfs_save(StringIO(request.files['uploaded_file'].read()).getvalue(), md5.hexdigest())
+        return json.dumps({"user": escape(session['username']), "md5": md5.hexdigest()})
     else:
         return """
             <form action='/upload' method='post' enctype='multipart/form-data'>
@@ -98,15 +98,17 @@ def photo_list():
 
 @app.route('/get/<md5>', methods=['GET'])
 def get(md5):
-    return json.dumps({"photo": hdfs_get(md5)})
+    m = hashlib.md5()
+    m.update(hdfs_get(md5))
+    return json.dumps({"photo": m.hexdigest()})
 
 
 def hdfs_save(f, name):
     hdfs.create_file(name, f)
 
 
-def hdfs_get(names):
-    return [hdfs.read_file(name) for name in names]
+def hdfs_get(name):
+    return hdfs.read_file(name)
 
 
 if __name__ == '__main__':
