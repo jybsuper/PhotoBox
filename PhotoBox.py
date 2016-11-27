@@ -1,8 +1,9 @@
-from flask import Flask, make_response, session, request, session, escape
+from flask import Flask, Response, session, request, session, escape
 from pymongo import MongoClient
-from hdfs import Config
 import hashlib
-import os
+import image
+from cStringIO import StringIO
+from pywebhdfs.webhdfs import PyWebHdfsClient
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -10,7 +11,7 @@ app.secret_key = '"\x9c\xb81\x1b\x15\xcczc[\r~\x99X\xbf\xa7Y\xd3\xa2\x99Q\xb3B\x
 app.debug = True
 
 db = MongoClient("localhost", 27017).photobox
-hdfs = Config().get_client('dev')
+hdfs = PyWebHdfsClient(host='127.0.0.1', port='50070', user_name='jyb')
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -76,7 +77,7 @@ def upload():
         if photo_id not in photos:
             photos.append(photo_id)
             db.users.update_one({"username": session['username']}, {"$set": {"photos": photos}})
-            hdfs_save(request.files['uploaded_file'], md5.hexdigest())
+            hdfs_save(StringIO(request.files['uploaded_file'].read()), md5.hexdigest())
         return "Success"
     else:
         return """
@@ -96,16 +97,17 @@ def index():
         return "You are not logged in."
     else:
         photos = db.users.find_one({"username": session['username']})["photos"]
-        photos = [db.photos.find_one(photo)["md5"] for photo in photos]
-        return str(hdfs_get(photos))
+        names = [db.photos.find_one(photo)["md5"] for photo in photos]
+        photos = hdfs_get(names)
+        return Response(photos[1], mimetype='image/jpeg')
 
 
 def hdfs_save(f, name):
-    f.save(os.path.join("static", name+'.jpg'))
+    hdfs.create_file(name, f)
 
 
 def hdfs_get(names):
-    return names
+    return [hdfs.read_file(name) for name in names]
 
 
 if __name__ == '__main__':
