@@ -3,6 +3,7 @@ from pymongo import MongoClient
 import hashlib
 from cStringIO import StringIO
 from pywebhdfs.webhdfs import PyWebHdfsClient
+import json
 
 app = Flask(__name__)
 app.secret_key = '"\x9c\xb81\x1b\x15\xcczc[\r~\x99X\xbf\xa7Y\xd3\xa2\x99Q\xb3B\xef'
@@ -15,13 +16,13 @@ hdfs = PyWebHdfsClient(host='127.0.0.1', port='50070', user_name='jyb')
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if "username" in session:
-        return "Logged in as %s" % escape(session['username'])
+        return json.dumps({"user": escape(session['username'])})
     elif request.method == 'POST':
         if db.users.count({"username": request.form['username'], "password": request.form['password']}):
             session['username'] = request.form['username']
-            return "Logged in as %s" % escape(session['username'])
+            return json.dumps({"user": escape(session['username'])})
         else:
-            return "Wrong username or password!"
+            return json.dumps({"user": None})
     else:
         return """
         <form action="/login" method="post">
@@ -36,9 +37,9 @@ def login():
 def logout():
     if "username" in session:
         session.pop('username', None)
-        return "Logged out"
+        return json.dumps({"user": None})
     else:
-        return "You are not logged in."
+        return json.dumps({"user": None})
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -47,9 +48,9 @@ def signup():
         if not db.users.count({"username": request.form['username']}):
             db.users.insert_one({"username": request.form['username'], "password": request.form['password'], "photos": []})
             session['username'] = request.form['username']
-            return "Success"
+            return json.dumps({"user": request.form['username']})
         else:
-            return "Please try another username"
+            return json.dumps({"user": None})
     else:
         return """
         <form action="/signup" method="post">
@@ -63,7 +64,7 @@ def signup():
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
     if "username" not in session:
-        return "You are not logged in."
+        return json.dumps({"user": None})
     elif request.method == 'POST':
         md5 = hashlib.md5()
         md5.update(request.files['uploaded_file'].read())
@@ -76,12 +77,9 @@ def upload():
             photos.append(photo_id)
             db.users.update_one({"username": session['username']}, {"$set": {"photos": photos}})
             hdfs_save(StringIO(request.files['uploaded_file'].read()), md5.hexdigest())
-        return "Success"
+        return json.dumps({"user": escape(session['username'])})
     else:
         return """
-            <!doctype html>
-            <html>
-            <body>
             <form action='/upload' method='post' enctype='multipart/form-data'>
                  <input type='file' name='uploaded_file'>
                  <input type='submit' value='Upload'>
@@ -89,15 +87,18 @@ def upload():
         """
 
 
-@app.route('/index', methods=['GET'])
-def index():
+@app.route('/list', methods=['GET'])
+def photo_list():
     if "username" not in session:
-        return "You are not logged in."
+        return json.dumps({"user": None})
     else:
-        photos = db.users.find_one({"username": session['username']})["photos"]
-        names = [db.photos.find_one(photo)["md5"] for photo in photos]
-        photos = hdfs_get(names)
-        return Response(photos[0], mimetype='image/jpeg')
+        photo_id = db.users.find_one({"username": session['username']})["photos"]
+        return json.dumps({"photo"+str(i): db.photos.find_one(photo)["md5"] for i, photo in enumerate(photo_id)})
+
+
+@app.route('/get/<md5>', methods=['GET'])
+def get(md5):
+    return json.dumps({"photo": hdfs_get(md5)})
 
 
 def hdfs_save(f, name):
