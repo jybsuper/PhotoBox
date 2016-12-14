@@ -1,69 +1,98 @@
 from requests import session
 import json
+import hashlib
+
+s = session()
+url = "http://127.0.0.1:5000"
+
+image = open("img1.jpeg", "rb").read()
+md5 = hashlib.md5()
+md5.update(image)
+md5 = md5.hexdigest()
 
 
 class TestClass:
-
-    def __init__(self):
-        self.s = session()
-        self.url = "http://127.0.0.1:5000"
-
     def test_signup(self):
         # user 1
-        response = self.s.post(self.url + "/signup", data={"username": "test1", "password": "test"})
+        response = s.post(url + "/signup", data={"username": "test1", "password": "test"})
         assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
 
         # user 2
-        response = self.s.post(self.url + "/signup", data={"username": "test2", "password": "test"})
+        response = s.post(url + "/signup", data={"username": "test2", "password": "test"})
         assert response.status_code == 200 and json.loads(response.text)["user"] == "test2"
 
         # duplicated user
-        response = self.s.post(self.url + "/signup", data={"username": "test1", "password": "test"})
+        response = s.post(url + "/signup", data={"username": "test1", "password": "test"})
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Duplicated username!"
 
     def test_logout(self):
-        response = self.s.get(self.url + "/logout")
+        response = s.get(url + "/logout")
         assert response.status_code == 200 and json.loads(response.text)["logout"] == "success"
 
-        response = self.s.get(self.url + "/logout")
+        response = s.get(url + "/logout")
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
 
-        response = self.s.post(self.url + "/photos")
+        response = s.post(url + "/photos")
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
 
-        s.get(url+"/photos")
-        if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-            print "Upload Error"
+        response = s.get(url + "/photos")
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
 
+        response = s.get(url + "/photos/test")
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
 
-    print "# Log in"
-    username = users.keys()[-1]
-    response = s.post(url+"/login", data={"username": username, "password": users[username]})
-    if response.status_code != 200 or json.loads(response.text)["user"] != username:
-        print "Log in Error1"
+        response = s.delete(url + "/photos/test")
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
 
-    response = s.get(url+"/login")
-    print response.status_code
-    if response.status_code != 200 or json.loads(response.text)["user"] != username:
-        print "Log in Error2"
+    def test_login(self):
+        response = s.post(url + "/login", data={"username": "test1", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
 
-    response = s.post(url+"/login", data={"username": "", "password": ""})
-    if response.status_code != 200 or json.loads(response.text)["user"] != username:
-        print "Log in Error3"
+        response = s.post(url + "/login", data={"username": "wrong", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
 
+        s.get(url + "/logout")
+        response = s.post(url + "/login", data={"username": "wrong", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Wrong password!"
 
-    print "# upload"
-    image = {"uploaded_file": open("img1.jpeg", "rb")}
-    response = s.post(url+"/upload", files=image)
-    j = json.loads(response.text)
-    if response.status_code != 200 or j["user"] != username or "md5" not in j:
-        print "Upload Error"
+        s.post(url + "/login", data={"username": "test1", "password": "test"})
 
-    print "# get photos"
-    response = s.get(url+"/list")
-    if response.status_code != 200 or j["md5"] not in json.loads(response.text).values():
-        print "Get list Error"
+    def test_upload(self):
+        image = {"uploaded_file": open("img1.jpeg", "rb")}
 
-    response = s.get(url+'/get/'+j["md5"])
-    if response.status_code != 200 or not json.loads(response.text)["photo"]:
-        print "Get photo Error"
+        response = s.post(url + "/photos", files=image)
+        assert response.status_code == 200 and json.loads(response.text)["photo_id"] == md5
+
+        test_file = {"uploaded_file": open("api.py", "rb")}
+        response = s.post(url + "/photos", files=test_file)
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Invalid format!"
+
+    def test_photo_list(self):
+        response = s.get(url+"/photos")
+        assert response.status_code == 200 and md5 in json.loads(response.text)["photo_ids"]
+
+    def test_get_delete(self):
+        response = s.get(url + "/photos" + md5)
+        assert response.status_code == 200 and md5 in json.loads(response.text)["photo"] == image
+
+        response = s.delete(url + "/photos" + md5)
+        assert response.status_code == 200 and md5 in json.loads(response.text)["delete"] == "success"
+
+        response = s.get(url + "/photos" + md5)
+        assert response.status_code == 200 and md5 in json.loads(response.text)["er"] == "Photo not found!"
+
+        response = s.delete(url + "/photos" + md5)
+        assert response.status_code == 200 and md5 in json.loads(response.text)["er"] == "Photo not found!"
+
+    def test_authority(self):
+        image = {"uploaded_file": open("img1.jpeg", "rb")}
+        s.post(url + "/photos", files=image)
+        s.get(url + "/logout")
+        s.post(url + "/login", data={"username": "test2", "password": "test"})
+
+        response = s.get(url + "/photos" + md5)
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Permission denied!"
+
+        response = s.delete(url + "/photos" + md5)
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Permission denied!"
+
