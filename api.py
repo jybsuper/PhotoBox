@@ -1,10 +1,11 @@
-from flask import Flask, request, session
+from flask import Flask, request, session, send_file
 from pymongo import MongoClient
 import hashlib
 from cStringIO import StringIO
 from pywebhdfs.webhdfs import PyWebHdfsClient
 import json
 from PIL import Image
+from io import BytesIO
 
 app = Flask(__name__)
 app.secret_key = '"\x9c\xb81\x1b\x15\xcczc[\r~\x99X\xbf\xa7Y\xd3\xa2\x99Q\xb3B\xef'
@@ -81,9 +82,9 @@ def get(photo_id):
     elif photo_id not in db.users.find_one({"username": session['username']})["photos"]:
         return json.dumps({"er": "Permission denied!"})
 
-    photo_info = db.photos.find_one({"md5": photo_id})
+    mime = db.photos.find_one({"md5": photo_id})["mime"]
     photo = hdfs.read_file(photo_id)
-    return json.dumps({"photo": photo, "Content-Type": photo_info["mime"]})
+    return send_file(BytesIO(photo), mimetype='image/' + mime)
 
 
 @app.route('/photos/<photo_id>', methods=["DELETE"])
