@@ -16,8 +16,6 @@ hdfs = PyWebHdfsClient(host='127.0.0.1', port='50070', user_name='jyb')
 
 @app.route('/login', methods=['POST'])
 def login():
-    if "username" in session:
-        return json.dumps({"user": session['username']})
     if db.users.count({"username": request.form['username'], "password": request.form['password']}):
         session['username'] = request.form['username']
         return json.dumps({"user": session['username']})
@@ -51,7 +49,10 @@ def create():
     photos = db.users.find_one({"username": session['username']})["photos"]
 
     image = StringIO(request.files['uploaded_file'].read())
-    mime = Image.open(image).format.lower()
+    try:
+        mime = Image.open(image).format.lower()
+    except IOError:
+        return json.dumps({"er": "Invalid format!"})
     if mime not in ("jpeg", "png", "gif"):
         return json.dumps({"er": "Invalid format!"})
 

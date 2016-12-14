@@ -10,7 +10,6 @@ md5 = hashlib.md5()
 md5.update(image)
 md5 = md5.hexdigest()
 
-
 class TestClass:
     def test_signup(self):
         # user 1
@@ -48,9 +47,6 @@ class TestClass:
         response = s.post(url + "/login", data={"username": "test1", "password": "test"})
         assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
 
-        response = s.post(url + "/login", data={"username": "wrong", "password": "test"})
-        assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
-
         s.get(url + "/logout")
         response = s.post(url + "/login", data={"username": "wrong", "password": "test"})
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Wrong password!"
@@ -72,16 +68,16 @@ class TestClass:
         assert response.status_code == 200 and md5 in json.loads(response.text)["photo_ids"]
 
     def test_get_delete(self):
-        response = s.get(url + "/photos" + md5)
+        response = s.get(url + "/photos/" + md5)
         assert response.status_code == 200 and md5 in json.loads(response.text)["photo"] == image
 
-        response = s.delete(url + "/photos" + md5)
+        response = s.delete(url + "/photos/" + md5)
         assert response.status_code == 200 and md5 in json.loads(response.text)["delete"] == "success"
 
-        response = s.get(url + "/photos" + md5)
+        response = s.get(url + "/photos/" + md5)
         assert response.status_code == 200 and md5 in json.loads(response.text)["er"] == "Photo not found!"
 
-        response = s.delete(url + "/photos" + md5)
+        response = s.delete(url + "/photos/" + md5)
         assert response.status_code == 200 and md5 in json.loads(response.text)["er"] == "Photo not found!"
 
     def test_authority(self):
@@ -90,9 +86,16 @@ class TestClass:
         s.get(url + "/logout")
         s.post(url + "/login", data={"username": "test2", "password": "test"})
 
-        response = s.get(url + "/photos" + md5)
+        response = s.get(url + "/photos/" + md5)
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Permission denied!"
 
-        response = s.delete(url + "/photos" + md5)
+        response = s.delete(url + "/photos/" + md5)
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Permission denied!"
 
+# t = TestClass()
+# t.test_signup()
+# t.test_login()
+# t.test_upload()
+# t.test_photo_list()
+# t.test_get_delete()
+# t.test_authority()
