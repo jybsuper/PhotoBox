@@ -10,6 +10,7 @@ md5 = hashlib.md5()
 md5.update(image)
 md5 = md5.hexdigest()
 
+
 class TestClass:
     def test_signup(self):
         # user 1
@@ -91,11 +92,3 @@ class TestClass:
 
         response = s.delete(url + "/photos/" + md5)
         assert response.status_code == 200 and json.loads(response.text)["er"] == "Permission denied!"
-
-# t = TestClass()
-# t.test_signup()
-# t.test_login()
-# t.test_upload()
-# t.test_photo_list()
-# t.test_get_delete()
-# t.test_authority()
