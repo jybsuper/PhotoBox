@@ -1,77 +1,69 @@
-#coding=utf-8
-__author__ = 'jyb'
-
-
 from requests import session
-import random
-from string import letters
 import json
 
-s = session()
-url = "http://127.0.0.1:5000"
 
-print "# Create users"
-s.get(url+"/signup")
+class TestClass:
 
-users = dict()
-for i in range(10):
-    username = ''.join(random.sample(letters, i+5))
-    pwd = ''.join(random.sample(letters, 6))
-    users[username] = pwd
-    response = s.post(url+"/signup", data={"username": username, "password": pwd})
+    def __init__(self):
+        self.s = session()
+        self.url = "http://127.0.0.1:5000"
+
+    def test_signup(self):
+        # user 1
+        response = self.s.post(self.url + "/signup", data={"username": "test1", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["user"] == "test1"
+
+        # user 2
+        response = self.s.post(self.url + "/signup", data={"username": "test2", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["user"] == "test2"
+
+        # duplicated user
+        response = self.s.post(self.url + "/signup", data={"username": "test1", "password": "test"})
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Duplicated username!"
+
+    def test_logout(self):
+        response = self.s.get(self.url + "/logout")
+        assert response.status_code == 200 and json.loads(response.text)["logout"] == "success"
+
+        response = self.s.get(self.url + "/logout")
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
+
+        response = self.s.post(self.url + "/photos")
+        assert response.status_code == 200 and json.loads(response.text)["er"] == "Not logged in!"
+
+        s.get(url+"/photos")
+        if response.status_code != 200 or json.loads(response.text)["user"] is not None:
+            print "Upload Error"
+
+
+    print "# Log in"
+    username = users.keys()[-1]
+    response = s.post(url+"/login", data={"username": username, "password": users[username]})
     if response.status_code != 200 or json.loads(response.text)["user"] != username:
-        print "Wrong user in signup"
+        print "Log in Error1"
 
-for u, p in users.items():
-    response = s.post(url+"/signup", data={"username": u, "password": p})
-    if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-        print "Duplicate user Error"
+    response = s.get(url+"/login")
+    print response.status_code
+    if response.status_code != 200 or json.loads(response.text)["user"] != username:
+        print "Log in Error2"
 
-
-print "# Log out"
-response = s.get(url + "/logout")
-if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-    print "Log out Error"
-s.post(url + "/logout")
-if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-    print "Log out Error"
-
-s.get(url+"/list")
-if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-    print "Get Photo list Error"
-
-s.get(url+"/upload")
-if response.status_code != 200 or json.loads(response.text)["user"] is not None:
-    print "Upload Error"
+    response = s.post(url+"/login", data={"username": "", "password": ""})
+    if response.status_code != 200 or json.loads(response.text)["user"] != username:
+        print "Log in Error3"
 
 
-print "# Log in"
-username = users.keys()[-1]
-response = s.post(url+"/login", data={"username": username, "password": users[username]})
-if response.status_code != 200 or json.loads(response.text)["user"] != username:
-    print "Log in Error"
+    print "# upload"
+    image = {"uploaded_file": open("img1.jpeg", "rb")}
+    response = s.post(url+"/upload", files=image)
+    j = json.loads(response.text)
+    if response.status_code != 200 or j["user"] != username or "md5" not in j:
+        print "Upload Error"
 
-response = s.get(url+"/login")
-if response.status_code != 200 or json.loads(response.text)["user"] != username:
-    print "Log in Error"
+    print "# get photos"
+    response = s.get(url+"/list")
+    if response.status_code != 200 or j["md5"] not in json.loads(response.text).values():
+        print "Get list Error"
 
-response = s.post(url+"/login", data={"username": "", "password": ""})
-if response.status_code != 200 or json.loads(response.text)["user"] != username:
-    print "Log in Error"
-
-
-print "# upload"
-image = {"uploaded_file": open("img1.jpeg", "rb")}
-response = s.post(url+"/upload", files=image)
-j = json.loads(response.text)
-if response.status_code != 200 or j["user"] != username or "md5" not in j:
-    print "Upload Error"
-
-print "# get photos"
-response = s.get(url+"/list")
-if response.status_code != 200 or j["md5"] not in json.loads(response.text).values():
-    print "Get list Error"
-
-response = s.get(url+'/get/'+j["md5"])
-if response.status_code != 200 or not json.loads(response.text)["photo"]:
-    print "Get photo Error"
+    response = s.get(url+'/get/'+j["md5"])
+    if response.status_code != 200 or not json.loads(response.text)["photo"]:
+        print "Get photo Error"
